@@ -23,6 +23,12 @@ using System.Collections.Generic;
         /// Whether any key is currently pressed.
         /// </summary>
         public static bool AnyKeyDown => pressedKeys.Count > 0;
+        
+        /// <summary>
+        /// Number of pressed keys at the moment
+        /// </summary>
+        public static int PressedKeysCount => pressedKeys.Count;
+        
         /// <summary>
         /// Whether input messages should be handled when the application is not in focus.
         /// </summary>

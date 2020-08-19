@@ -1,18 +1,19 @@
 ﻿﻿using System;
 using System.Collections.Generic;
+ using UnityEngine;
 
-namespace UnityRawInput
+ namespace UnityRawInput
 {
     public static class RawKeyInput
     {
         /// <summary>
         /// Event invoked when user presses a key.
         /// </summary>
-        public static event Action<RawKey> OnKeyDown;
+        public static event Func<RawKey, bool> OnKeyDown;
         /// <summary>
         /// Event invoked when user releases a key.
         /// </summary>
-        public static event Action<RawKey> OnKeyUp;
+        public static event Func<RawKey, bool> OnKeyUp;
 
         /// <summary>
         /// Whether the service is running and input messages are being processed.
@@ -26,10 +27,6 @@ namespace UnityRawInput
         /// Whether input messages should be handled when the application is not in focus.
         /// </summary>
         public static bool WorkInBackground { get; private set; }
-        /// <summary>
-        /// Whether handled input messages should not be propagated further.
-        /// </summary>
-        public static bool InterceptMessages { get; set; }
 
         private static IntPtr hookPtr = IntPtr.Zero;
         private static HashSet<RawKey> pressedKeys = new HashSet<RawKey>();
@@ -88,42 +85,59 @@ namespace UnityRawInput
         [AOT.MonoPInvokeCallback(typeof(Win32API.HookProc))]
         private static int HandleHookProc (int code, IntPtr wParam, IntPtr lParam)
         {
-            if (code < 0) return Win32API.CallNextHookEx(hookPtr, code, wParam, lParam);
+            if (code < 0) 
+                return Win32API.CallNextHookEx(hookPtr, code, wParam, lParam);
 
             var isKeyDown = ((int)lParam & (1 << 31)) == 0;
             var key = (RawKey)wParam;
+            var handled = isKeyDown ? HandleKeyDown(key) : HandleKeyUp(key);
 
-            if (isKeyDown) HandleKeyDown(key);
-            else HandleKeyUp(key);
-
-            return InterceptMessages ? 1 : Win32API.CallNextHookEx(hookPtr, 0, wParam, lParam);
+            return handled ? 1 : Win32API.CallNextHookEx(hookPtr, 0, wParam, lParam);
         }
 
         [AOT.MonoPInvokeCallback(typeof(Win32API.HookProc))]
         private static int HandleLowLevelHookProc (int code, IntPtr wParam, IntPtr lParam)
         {
-            if (code < 0) return Win32API.CallNextHookEx(hookPtr, code, wParam, lParam);
+            if (code < 0) 
+                return Win32API.CallNextHookEx(hookPtr, code, wParam, lParam);
 
             var kbd = KBDLLHOOKSTRUCT.CreateFromPtr(lParam);
             var keyState = (RawKeyState)wParam;
             var key = (RawKey)kbd.vkCode;
+            var isKeyDown = keyState == RawKeyState.KeyDown || keyState == RawKeyState.SysKeyDown;
+            var handled = isKeyDown ? HandleKeyDown(key) : HandleKeyUp(key);
 
-            if (keyState == RawKeyState.KeyDown || keyState == RawKeyState.SysKeyDown) HandleKeyDown(key);
-            else HandleKeyUp(key);
-
-            return InterceptMessages ? 1 : Win32API.CallNextHookEx(hookPtr, 0, wParam, lParam);
+            return handled ? 1 : Win32API.CallNextHookEx(hookPtr, 0, wParam, lParam);
         }
 
-        private static void HandleKeyDown (RawKey key)
+        private static bool HandleKeyDown (RawKey key)
         {
-            var added = pressedKeys.Add(key);
-            if (added && OnKeyDown != null) OnKeyDown.Invoke(key);
+            try
+            {
+                var added = pressedKeys.Add(key);
+                return added && OnKeyDown != null && OnKeyDown.Invoke(key);
+            }
+            catch (Exception e)
+            {
+                Debug.Log(e);
+            }
+
+            return false;
         }
 
-        private static void HandleKeyUp (RawKey key)
+        private static bool HandleKeyUp (RawKey key)
         {
-            pressedKeys.Remove(key);
-            if (OnKeyUp != null) OnKeyUp.Invoke(key);
+            try
+            {
+                var removed = pressedKeys.Remove(key);
+                return removed && OnKeyUp != null && OnKeyUp.Invoke(key);
+            }
+            catch (Exception e)
+            {
+                Debug.Log(e);
+            }
+            
+            return false;
         }
     }
 }

@@ -1,0 +1,11 @@
+{
+  "name": "com.elringus.unity.rawinput",
+  "version": "1.1.0",
+  "displayName": "Unity Raw Input",
+  "unity": "2017.4",
+  "author": {
+    "name": "Elringus"
+  },
+  "description": "Package wrapper for https://github.com/Elringus/UnityRawInput",
+  "type": "library"
+}

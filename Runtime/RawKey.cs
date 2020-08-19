@@ -1,4 +1,4 @@
-﻿
+﻿﻿
 namespace UnityRawInput
 {
     public enum RawKey : ushort

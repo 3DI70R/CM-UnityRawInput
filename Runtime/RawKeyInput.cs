@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.Collections.Generic;
  using UnityEngine;
 
@@ -6,15 +6,6 @@ using System.Collections.Generic;
 {
     public static class RawKeyInput
     {
-        /// <summary>
-        /// Event invoked when user presses a key.
-        /// </summary>
-        public static event Func<RawKey, bool> OnKeyDown;
-        /// <summary>
-        /// Event invoked when user releases a key.
-        /// </summary>
-        public static event Func<RawKey, bool> OnKeyUp;
-
         /// <summary>
         /// Whether the service is running and input messages are being processed.
         /// </summary>
@@ -36,6 +27,8 @@ using System.Collections.Generic;
 
         private static IntPtr hookPtr = IntPtr.Zero;
         private static HashSet<RawKey> pressedKeys = new HashSet<RawKey>();
+        private static List<Func<RawKey, bool>> onKeyDownListeners = new List<Func<RawKey, bool>>();
+        private static List<Func<RawKey, bool>> onKeyUpListeners = new List<Func<RawKey, bool>>();
 
         /// <summary>
         /// Initializes the service and starts processing input messages.
@@ -115,13 +108,32 @@ using System.Collections.Generic;
 
             return handled ? 1 : Win32API.CallNextHookEx(hookPtr, 0, wParam, lParam);
         }
+        
+        public static void AddKeyDownListener(Func<RawKey, bool> onKeyDown)
+        {
+            onKeyDownListeners.Add(onKeyDown);
+        }
+
+        public static void RemoveKeyDownListener(Func<RawKey, bool> onKeyDown)
+        {
+            onKeyDownListeners.Remove(onKeyDown);
+        }
+
+        public static void AddKeyUpListener(Func<RawKey, bool> onKeyUp)
+        {
+            onKeyUpListeners.Add(onKeyUp);
+        }
+        
+        public static void RemoveKeyUpListener(Func<RawKey, bool> onKeyUp)
+        {
+            onKeyUpListeners.Remove(onKeyUp);
+        }
 
         private static bool HandleKeyDown (RawKey key)
         {
             try
             {
-                var added = pressedKeys.Add(key);
-                return added && OnKeyDown != null && OnKeyDown.Invoke(key);
+                return pressedKeys.Add(key) && CallListeners(onKeyDownListeners, key);
             }
             catch (Exception e)
             {
@@ -135,8 +147,7 @@ using System.Collections.Generic;
         {
             try
             {
-                var removed = pressedKeys.Remove(key);
-                return removed && OnKeyUp != null && OnKeyUp.Invoke(key);
+                return pressedKeys.Remove(key) && CallListeners(onKeyUpListeners, key);
             }
             catch (Exception e)
             {
@@ -144,6 +155,19 @@ using System.Collections.Generic;
             }
             
             return false;
+        }
+
+        private static bool CallListeners(List<Func<RawKey, bool>> listenerList, RawKey button)
+        {
+            var result = false;
+            
+            for (var i = 0; i < listenerList.Count; i++)
+            {
+                if (listenerList[i](button)) 
+                    result = true;
+            }
+
+            return result;
         }
     }
 }
